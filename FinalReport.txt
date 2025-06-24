@@ -1,0 +1,184 @@
+Electric Grid Failure Prediction: Final Report
+1. Introduction
+The "Electric Grid Failure Prediction" project aims to model an electric grid using data structures and algorithms (DSA) to predict potential failures due to overloads or load increases. The grid is represented as an undirected graph, with nodes as substations and edges as transmission lines. The program simulates load increases, detects overloads, and models cascading failures, providing insights into grid reliability and resilience.
+This report summarizes the project’s objectives, implementation details, test results, and recommendations, demonstrating its functionality and potential applications.
+2. Objectives
+
+Model the Electric Grid: Represent substations and transmission lines as a graph with load and capacity attributes.
+Detect Overloads: Identify nodes and edges exceeding their capacity.
+Simulate Load Increases: Predict failures under uniform or random load increases.
+Handle Cascading Failures: Model how one failure triggers others, leading to potential blackouts.
+Enhance Usability: Provide an interactive interface, file I/O, and clear reporting.
+Validate Functionality: Test the program with diverse scenarios to ensure robustness.
+
+3. Implementation
+3.1. DSA Techniques Used
+The project leverages several DSA techniques to efficiently model and analyze the electric grid:
+
+Graph Representation: Utilizes an adjacency list to store the undirected graph, enabling O(V + E) access to nodes and edges, where V is the number of nodes (substations) and E is the number of edges (transmission lines).
+Depth-First Search (DFS): Employed for connectivity checking, traversing the graph to identify connected components (O(V + E) time complexity).
+Priority Queue: Used in cascading failure simulation to process overloads based on severity (load/capacity ratio), with O(log E) insertion and O((V + E) log E) overall complexity for failure propagation.
+Set and Map Data Structures: A set avoids duplicate edge reporting, and a map (edgeIndex) ensures unique edge tracking, both with O(log n) operations.
+Linear Search: Applied for overload detection and state reporting, with O(V + E) complexity.
+
+3.2. System Architecture
+The system is designed as a single-threaded, console-based application with a modular structure:
+
+Graph Class: Core component managing nodes, edges, and all grid operations (e.g., addNode, addEdge, checkOverloads).
+Input/Output Layer: Handles user interactions via a menu-driven interface, supporting manual input, file I/O, and state display.
+Simulation Engine: Executes load increase simulations and cascading failure logic, using random number generation for variability.
+Data Flow: User inputs define the initial grid, which is processed by the simulation engine. Results are reported back to the user or saved to files.
+Memory Management: Dynamic arrays (vector) and maps ensure scalability within the constraints of small to medium grids.
+
+3.3. Algorithms/Pseudocode
+Connectivity Check (DFS)
+Algorithm DFS(v, visited)
+    visited[v] ← true
+    for each edge e in adj[v]
+        if e.active and nodes[e.to].active and not visited[e.to]
+            DFS(e.to, visited)
+End Algorithm
+
+Algorithm isConnected()
+    visited ← array of false (size = numNodes)
+    start ← first active node
+    if start = -1 return true
+    DFS(start, visited)
+    for i = 0 to numNodes-1
+        if nodes[i].active and not visited[i]
+            return false
+    return true
+End Algorithm
+
+Cascading Failure Simulation
+Algorithm simulateCascadingFailures(loadIncreasePercent, randomLoad)
+    Backup original node and edge states
+    Apply load increase with random factor (if randomLoad)
+    Initialize priority queue pq with initial overloads (severity = load/capacity)
+    While pq is not empty
+        severity, (u, v) ← pq.pop()
+        if v = -1 (node failure)
+            if nodes[u].active
+                nodes[u].active ← false
+                Report node failure
+        else (edge failure)
+            if edge (u, v) is active
+                Deactivate edge (u, v)
+                Report edge failure
+                Redistribute load to remaining edges
+        Recheck overloads and add new failures to pq
+    Report final grid state
+    Restore original states
+End Algorithm
+
+3.4. Dataset & Evaluation Metrics
+
+Dataset: The program uses synthetic data input by the user, representing a small electric grid (e.g., 3-4 nodes, 2-4 edges). No external dataset is integrated, but the system supports loading custom configurations from text files (e.g., grid.txt) with node/edge details.
+Evaluation Metrics:
+Overload Detection Accuracy: Percentage of correctly identified overloaded nodes and edges (100% in test cases).
+Connectivity Preservation: Boolean check of grid connectedness post-simulation (validated in Test Cases 3-4).
+Failure Propagation: Number of cascading failures triggered by initial overloads (e.g., 1-3 failures in Test Case 4).
+Runtime Efficiency: Measured as O(V + E) for most operations, with O((V + E) log E) for cascading simulations, suitable for small grids (<100 nodes).
+Robustness: Success rate of handling invalid inputs (100% with retry prompts in test cases).
+
+
+
+3.5. Code Structure
+
+Language: C++11 for portability and performance.
+Files: Single source file (grid_failure.cpp) for simplicity.
+Dependencies: Standard C++ libraries (iostream, vector, queue, map, random, etc.).
+Compilation: g++ -std=c++11 grid_failure.cpp -o grid_failure.
+
+4. Test Results
+Five test cases validated the program’s functionality:
+
+Small Grid (No Overloads):
+
+Input: 3 nodes (A, B, C), 2 edges.
+Result: Correctly displayed grid, confirmed no overloads, and verified connectivity.
+Pass: Yes.
+
+
+Initial Overloaded Edge:
+
+Input: 4 nodes, 3 edges with one at full capacity.
+Result: Detected overloaded edge A-B and confirmed connectivity.
+Pass: Yes.
+
+
+Uniform Load Increase:
+
+Input: 3 nodes, 2 edges, 100% load increase.
+Result: Detected edge failure, reported grid state, and restored original state.
+Pass: Yes.
+
+
+Random Load Increase:
+
+Input: 4 nodes, 3 edges, 50% base increase.
+Result: Simulated multiple failures, detected grid disconnection, and reported components.
+Pass: Yes.
+
+
+File I/O:
+
+Input: 3 nodes, 2 edges, saved to grid.txt.
+Result: Successfully saved and reloaded grid, verified identical state.
+Pass: Yes.
+
+
+
+Summary: All test cases passed, confirming robustness across setup, failure simulation, and file operations.
+5. Analysis
+5.1. Strengths
+
+Robustness: Handles invalid inputs gracefully and prevents errors like self-loops or duplicates.
+Flexibility: Supports uniform and random load increases, suitable for various scenarios.
+Realism: Cascading failure simulation mimics real-world blackout propagation.
+Usability: Interactive menu and file I/O enhance user experience.
+Efficiency: O(V + E) for most operations, suitable for small to medium grids.
+
+5.2. Limitations
+
+Simplified Model: Lacks power flow physics (e.g., voltage, reactive power).
+Load Redistribution: Basic heuristic (10% increase) may not reflect real grid behavior.
+Scalability: Adjacency list and DFS may be slow for very large grids (e.g., >10,000 nodes).
+Time Dimension: No support for time-varying loads or seasonal patterns.
+Visualization: Text-based output limits visual analysis.
+
+6. Recommendations
+6.1. Enhancements
+
+Power Flow Analysis: Implement DC power flow equations for realistic load distribution.
+Time-Series Simulation: Model load variations over hours or days using historical data.
+Visualization: Output DOT files for Graphviz or integrate with a GUI library (e.g., SFML).
+Optimization: Use disjoint-set for dynamic connectivity or sparse matrices for large grids.
+Advanced Failure Models: Include voltage collapse or thermal limits.
+
+6.2. Future Work
+
+Machine Learning Integration: Use historical failure data to predict critical components.
+Parallel Processing: Distribute simulations for large-scale grids.
+Real-World Data: Test with public grid datasets (e.g., IEEE test systems).
+Cross-Platform GUI: Develop a web or desktop app for broader accessibility.
+
+7. Conclusion
+The "Electric Grid Failure Prediction" project successfully delivers a DSA-based tool to model and analyze electric grid reliability. It provides robust functionality for overload detection, failure simulation, and grid management, validated through comprehensive test cases. While the model simplifies real-world grid dynamics, it serves as an effective educational and analytical tool, with clear potential for extension into more realistic applications.
+The project demonstrates the power of graph-based algorithms in solving complex infrastructure problems and lays a foundation for future enhancements in grid resilience analysis.
+8. Appendices
+8.1. Sample Input File (grid.txt)
+3
+A 50 100
+B 60 120
+C 70 140
+2
+0 1 40 80
+1 2 50 100
+
+8.2. Compilation Instructions
+g++ -std=c++11 grid_failure.cpp -o grid_failure
+./grid_failure
+
+8.3. Contact
+For further details or source code, contact the project developer via [adityaprakashiu].
