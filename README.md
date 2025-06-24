@@ -124,7 +124,7 @@ This project simulates an electric grid's response to load increases, predicting
 - Suggestions for improvements (e.g., visualization, optimization) are welcome.
 
 ## License
-- This project is open-source under the MIT License (or specify your preferred license).
+- This project is open-source under the MIT License.
 
 ## Future Enhancements
 - **Improved Load Redistribution:** Make it proportional to capacity or neighbor loads.
@@ -150,5 +150,3 @@ This project simulates an electric grid's response to load increases, predicting
 ### **Next Steps**
 - Let me know if you’d like to add more sections (e.g., troubleshooting, acknowledgments) or adjust the content.
 - If you’re ready to move on, we can explore testing, enhancements, or deployment—your choice!
-
-What would you like to do next?
