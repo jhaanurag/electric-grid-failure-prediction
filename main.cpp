@@ -8,6 +8,8 @@
 #include <fstream>
 #include <random>
 #include <iomanip>
+#include <ctime>
+#include <sstream>
 
 using namespace std;
 
@@ -27,41 +29,59 @@ struct Node {
     bool active; // Is the node operational?
 };
 
+// Union-Find for connectivity
+class UnionFind {
+private:
+    vector<int> parent, rank;
+public:
+    UnionFind(int n) : parent(n), rank(n, 0) {
+        for (int i = 0; i < n; i++) parent[i] = i;
+    }
+    int find(int x) {
+        if (x < 0 || x >= static_cast<int>(parent.size())) return -1;
+        if (parent[x] != x) parent[x] = find(parent[x]);
+        return parent[x];
+    }
+    int find(int x) const {
+        if (x < 0 || x >= static_cast<int>(parent.size())) return -1;
+        if (parent[x] == x) return x;
+        return find(parent[x]);
+    }
+    void unite(int x, int y) {
+        int px = find(x), py = find(y);
+        if (px == py || px == -1 || py == -1) return;
+        if (rank[px] < rank[py]) parent[px] = py;
+        else if (rank[px] > rank[py]) parent[py] = px;
+        else {
+            parent[py] = px;
+            rank[px]++;
+        }
+    }
+    bool connected(int x, int y) const {
+        return find(x) == find(y);
+    }
+};
+
+// Structure to store grid state for backup
+struct GridState {
+    vector<bool> nodeActive;
+    vector<double> nodeLoads;
+    vector<vector<bool>> edgeActive;
+    vector<vector<double>> edgeLoads;
+};
+
 // Graph class to represent the electric grid
 class Graph {
 private:
     vector<Node> nodes; // List of nodes
     vector<vector<Edge>> adj; // Adjacency list for edges
     int numNodes;
-    map<pair<int, int>, int> edgeIndex; // Map (u,v) to edge index in adj[u]
+    map<pair<int, int>, pair<int, int>> edgeIndex; // Map (u,v) to (index in adj[u], index in adj[v])
     default_random_engine rng; // For random load variations
 
-    // DFS to check if grid is connected
-    void DFS(int v, vector<bool>& visited) {
-        visited[v] = true;
-        for (const Edge& e : adj[v]) {
-            if (e.active && nodes[e.to].active && !visited[e.to]) {
-                DFS(e.to, visited);
-            }
-        }
-    }
-
-    // Find connected components
-    vector<vector<int>> findComponents() {
-        vector<bool> visited(numNodes, false);
-        vector<vector<int>> components;
-        for (int i = 0; i < numNodes; i++) {
-            if (!visited[i] && nodes[i].active) {
-                vector<int> component;
-                DFS(i, visited, component);
-                components.push_back(component);
-            }
-        }
-        return components;
-    }
-
-    // Helper for DFS to collect component nodes
-    void DFS(int v, vector<bool>& visited, vector<int>& component) {
+    // DFS to collect component nodes
+    void DFS(int v, vector<bool>& visited, vector<int>& component) const {
+        if (v < 0 || v >= numNodes) return; // Ensure valid node index
         visited[v] = true;
         component.push_back(v);
         for (const Edge& e : adj[v]) {
@@ -71,20 +91,64 @@ private:
         }
     }
 
+    // Save current grid state
+    GridState saveState() const {
+        GridState state;
+        state.nodeActive.resize(numNodes);
+        state.nodeLoads.resize(numNodes);
+        state.edgeActive.resize(numNodes);
+        state.edgeLoads.resize(numNodes);
+        for (int i = 0; i < numNodes; i++) {
+            state.nodeActive[i] = nodes[i].active;
+            state.nodeLoads[i] = nodes[i].load;
+            state.edgeActive[i].resize(adj[i].size());
+            state.edgeLoads[i].resize(adj[i].size());
+            for (size_t j = 0; j < adj[i].size(); j++) {
+                state.edgeActive[i][j] = adj[i][j].active;
+                state.edgeLoads[i][j] = adj[i][j].currentLoad;
+            }
+        }
+        return state;
+    }
+
+    // Restore grid state
+    void restoreState(const GridState& state) {
+        for (int i = 0; i < numNodes && i < static_cast<int>(state.nodeActive.size()); i++) {
+            nodes[i].active = state.nodeActive[i];
+            nodes[i].load = state.nodeLoads[i];
+            if (i < static_cast<int>(state.edgeActive.size()) && adj[i].size() == state.edgeActive[i].size()) {
+                for (size_t j = 0; j < adj[i].size(); j++) {
+                    adj[i][j].active = state.edgeActive[i][j];
+                    adj[i][j].currentLoad = state.edgeLoads[i][j];
+                }
+            }
+        }
+    }
+
 public:
-    Graph(int n) : numNodes(n), rng(random_device{}()) {
+    Graph(int n) : numNodes(n), rng() {
         nodes.resize(n, {"", 0.0, 0.0, true});
         adj.resize(n);
+        // Explicitly seed rng for reproducibility
+        rng.seed(static_cast<unsigned>(time(nullptr)));
     }
 
     // Add a node (substation)
-    bool addNode(int idx, string name, double load, double maxCapacity) {
+    bool addNode(int idx, const string& name, double load, double maxCapacity) {
         if (idx < 0 || idx >= numNodes) {
             cout << "Invalid node index: " << idx << ". Must be between 0 and " << (numNodes - 1) << ".\n";
             return false;
         }
-        if (load < 0 || maxCapacity <= 0 || load > maxCapacity) {
-            cout << "Invalid load or max capacity for node " << name << ". Load must be >= 0, max capacity > 0, and load <= max capacity.\n";
+        if (load < 0) {
+            cout << "Invalid load for node " << name << ". Load must be >= 0.\n";
+            return false;
+        }
+        if (maxCapacity <= 0) {
+            cout << "Invalid max capacity for node " << name << ". Max capacity must be > 0.\n";
+            return false;
+        }
+        if (load > maxCapacity) {
+            cout << "Invalid load for node " << name << ". Load must be <= max capacity (" << maxCapacity << ").\n";
             return false;
         }
         nodes[idx] = {name, load, maxCapacity, true};
@@ -101,51 +165,73 @@ public:
             cout << "Self-loops are not allowed: " << from << " to " << to << ".\n";
             return false;
         }
-        if (capacity <= 0 || currentLoad < 0) {
-            cout << "Invalid load or capacity for edge " << from << "-" << to 
-                 << ". Capacity must be > 0, load >= 0.\n";
+        if (capacity <= 0) {
+            cout << "Invalid capacity for edge " << from << "-" << to << ". Capacity must be > 0.\n";
             return false;
         }
-        // Check for duplicate edge
-        if (edgeIndex.find({min(from, to), max(from, to)}) != edgeIndex.end()) {
+        if (currentLoad < 0) {
+            cout << "Invalid load for edge " << from << "-" << to << ". Load must be >= 0.\n";
+            return false;
+        }
+        pair<int, int> edge = {min(from, to), max(from, to)};
+        if (edgeIndex.find(edge) != edgeIndex.end()) {
             cout << "Duplicate edge between " << from << " and " << to << ".\n";
             return false;
         }
         adj[from].push_back({to, capacity, currentLoad, true});
         adj[to].push_back({from, capacity, currentLoad, true});
-        edgeIndex[{min(from, to), max(from, to)}] = adj[from].size() - 1;
+        edgeIndex[edge] = {static_cast<int>(adj[from].size()) - 1, static_cast<int>(adj[to].size()) - 1};
         return true;
     }
 
-    // Check if the grid is connected
-    bool isConnected() {
-        vector<bool> visited(numNodes, false);
-        int start = -1;
+    // Check if the grid is connected using Union-Find
+    bool isConnected() const {
+        UnionFind uf(numNodes);
+        for (int u = 0; u < numNodes; u++) {
+            if (!nodes[u].active) continue;
+            for (const Edge& e : adj[u]) {
+                if (e.active && nodes[e.to].active) {
+                    uf.unite(u, e.to);
+                }
+            }
+        }
+        int root = -1;
         for (int i = 0; i < numNodes; i++) {
             if (nodes[i].active) {
-                start = i;
+                root = uf.find(i);
                 break;
             }
         }
-        if (start == -1) return true; // Empty grid is connected
-        DFS(start, visited);
+        if (root == -1) return true; // Empty grid
         for (int i = 0; i < numNodes; i++) {
-            if (nodes[i].active && !visited[i]) return false;
+            if (nodes[i].active && uf.find(i) != root) return false;
         }
         return true;
     }
 
+    // Find connected components
+    vector<vector<int>> findComponents() const {
+        vector<bool> visited(numNodes, false);
+        vector<vector<int>> components;
+        for (int i = 0; i < numNodes; i++) {
+            if (!visited[i] && nodes[i].active) {
+                vector<int> component;
+                DFS(i, visited, component);
+                components.push_back(component);
+            }
+        }
+        return components;
+    }
+
     // Check for overloaded nodes or edges
-    void checkOverloads(vector<string>& overloadedNodes, vector<pair<int, int>>& overloadedEdges) {
+    void checkOverloads(vector<string>& overloadedNodes, vector<pair<int, int>>& overloadedEdges) const {
         overloadedNodes.clear();
         overloadedEdges.clear();
-        // Check nodes
         for (int i = 0; i < numNodes; i++) {
-            if (nodes[i].active && nodes[i].load >= nodes[i].maxCapacity) { // Include equality
+            if (nodes[i].active && nodes[i].load >= nodes[i].maxCapacity) {
                 overloadedNodes.push_back(nodes[i].name);
             }
         }
-        // Check edges
         set<pair<int, int>> seenEdges;
         for (int u = 0; u < numNodes; u++) {
             for (const Edge& e : adj[u]) {
@@ -167,18 +253,18 @@ public:
         cout << "\nSimulating load increase by " << loadIncreasePercent << "% "
              << (randomLoad ? "with random variations" : "uniformly") << "\n";
 
-        // Backup original state
-        vector<Node> originalNodes = nodes;
-        vector<vector<Edge>> originalAdj = adj;
+        // Backup state
+        GridState originalState = saveState();
 
         // Apply load increase
-        uniform_real_distribution<double> dist(1.0, 1.5); // Random factor 50%-150%
+        uniform_real_distribution<double> dist(0.5, 1.5); // Random factor 50%-150%
         for (int i = 0; i < numNodes; i++) {
             if (nodes[i].active) {
                 double factor = randomLoad ? dist(rng) : 1.0;
                 double oldLoad = nodes[i].load;
                 nodes[i].load *= (1 + loadIncreasePercent / 100.0 * factor);
-                cout << "Node " << nodes[i].name << ": Load increased from " << oldLoad << " to " << nodes[i].load << " (factor = " << factor << ")\n";
+                cout << "Node " << nodes[i].name << ": Load increased from " << fixed << setprecision(2)
+                     << oldLoad << " to " << nodes[i].load << " MW (factor = " << factor << ")\n";
             }
         }
         for (int u = 0; u < numNodes; u++) {
@@ -187,18 +273,18 @@ public:
                     double factor = randomLoad ? dist(rng) : 1.0;
                     double oldLoad = e.currentLoad;
                     e.currentLoad *= (1 + loadIncreasePercent / 100.0 * factor);
-                    cout << "Edge " << nodes[u].name << "-" << nodes[e.to].name << ": Load increased from " << oldLoad << " to " << e.currentLoad << " (factor = " << factor << ")\n";
+                    cout << "Edge " << nodes[u].name << "-" << nodes[e.to].name << ": Load increased from "
+                         << oldLoad << " to " << e.currentLoad << " MW (factor = " << factor << ")\n";
                 }
             }
         }
 
         // Simulate cascading failures
         priority_queue<pair<double, pair<int, int>>, vector<pair<double, pair<int, int>>>, greater<>> pq;
-        // Add initial overloads to priority queue (severity = load/capacity)
         vector<string> overloadedNodes;
         vector<pair<int, int>> overloadedEdges;
         checkOverloads(overloadedNodes, overloadedEdges);
-        cout << "Overloaded Nodes: " << overloadedNodes.size() << ", Overloaded Edges: " << overloadedEdges.size() << "\n";
+        cout << "Initial Overloaded Nodes: " << overloadedNodes.size() << ", Overloaded Edges: " << overloadedEdges.size() << "\n";
         for (const string& name : overloadedNodes) {
             for (int i = 0; i < numNodes; i++) {
                 if (nodes[i].name == name && nodes[i].active) {
@@ -218,32 +304,30 @@ public:
 
         // Process failures
         while (!pq.empty()) {
-            pair<double, pair<int, int>> topElement = pq.top();
+            double severity = pq.top().first;
+            pair<int, int> p = pq.top().second;
             pq.pop();
-            double severity = topElement.first;
-            int u = topElement.second.first;
-            int v = topElement.second.second;
+            int u = p.first, v = p.second;
 
             if (v == -1) { // Node failure
-                if (!nodes[u].active) continue; // Skip if already failed
+                if (u < 0 || u >= numNodes || !nodes[u].active) continue; // Skip if already failed or invalid
                 nodes[u].active = false;
                 cout << "Node " << nodes[u].name << " failed (load = " << fixed << setprecision(2)
                      << nodes[u].load << " MW, capacity = " << nodes[u].maxCapacity << " MW)\n";
             } else { // Edge failure
                 pair<int, int> edge = {min(u, v), max(u, v)};
-                if (!adj[u][edgeIndex[edge]].active) continue; // Skip if already failed
-                for (Edge& e : adj[u]) {
-                    if (e.to == v) e.active = false;
-                }
-                for (Edge& e : adj[v]) {
-                    if (e.to == u) e.active = false;
+                auto it = edgeIndex.find(edge);
+                if (it == edgeIndex.end()) continue;
+                int idx_u = it->second.first, idx_v = it->second.second;
+                if (idx_u >= static_cast<int>(adj[u].size()) || !adj[u][idx_u].active) continue;
+                double failedLoad = adj[u][idx_u].currentLoad;
+                adj[u][idx_u].active = false;
+                if (idx_v < static_cast<int>(adj[v].size())) {
+                    adj[v][idx_v].active = false;
                 }
                 cout << "Edge " << nodes[u].name << "-" << nodes[v].name << " failed (load = "
-                     << adj[u][edgeIndex[edge]].currentLoad << " MW, capacity = "
-                     << adj[u][edgeIndex[edge]].capacity << " MW)\n";
-
-                // Redistribute load to neighboring edges
-                redistributeLoad(u, v);
+                     << failedLoad << " MW, capacity = " << adj[u][idx_u].capacity << " MW)\n";
+                redistributeLoad(u, v, failedLoad);
             }
 
             // Recheck overloads
@@ -269,34 +353,94 @@ public:
 
         // Report final state
         reportGridState();
+        saveGridVisualization("grid.dot");
 
-        // Restore original state
-        nodes = originalNodes;
-        adj = originalAdj;
+        // Restore state
+        restoreState(originalState);
     }
 
     // Redistribute load after edge failure
-    void redistributeLoad(int u, int v) {
-        // Simple redistribution: Increase load on remaining active edges
-        for (int i = 0; i < numNodes; i++) {
-            if (!nodes[i].active) continue;
+    void redistributeLoad(int u, int v, double failedLoad) {
+        for (int i : {u, v}) {
+            if (i < 0 || i >= numNodes) continue; // Ensure valid node index
             double totalCapacity = 0.0;
-            for (const Edge& e : adj[i]) {
-                if (e.active && nodes[e.to].active) {
-                    totalCapacity += e.capacity;
+            vector<Edge*> activeEdges;
+            for (Edge& e : adj[i]) {
+                if (e.active && nodes[e.to].active && e.currentLoad < e.capacity) {
+                    totalCapacity += e.capacity - e.currentLoad;
+                    activeEdges.push_back(&e);
                 }
             }
-            if (totalCapacity == 0) continue;
-            for (Edge& e : adj[i]) {
-                if (e.active && nodes[e.to].active) {
-                    e.currentLoad += e.currentLoad * 0.1; // 10% increase
-                }
+            if (totalCapacity <= 0 || activeEdges.empty()) {
+                cout << "Warning: No available capacity to redistribute load from node " << nodes[i].name << "\n";
+                continue;
+            }
+            double loadPerCapacity = failedLoad / totalCapacity;
+            for (Edge* e : activeEdges) {
+                double additionalLoad = loadPerCapacity * (e->capacity - e->currentLoad);
+                e->currentLoad += additionalLoad;
+                cout << "Redistributed " << fixed << setprecision(2) << additionalLoad << " MW to edge "
+                     << nodes[i].name << "-" << nodes[e->to].name << "\n";
             }
         }
     }
 
+    // Identify critical nodes and edges
+    void identifyCriticalComponents() {
+        cout << "\nCritical Component Analysis:\n";
+        GridState originalState = saveState();
+
+        // Test each node
+        cout << "Critical Nodes (failure disconnects grid):\n";
+        for (int i = 0; i < numNodes; i++) {
+            if (!nodes[i].active) continue;
+            nodes[i].active = false;
+            if (!isConnected()) {
+                cout << "- " << nodes[i].name << ": Failure disconnects grid\n";
+            }
+            nodes[i].active = true;
+        }
+
+        // Test each edge
+        cout << "Critical Edges (failure causes overloads or disconnection):\n";
+        set<pair<int, int>> seenEdges;
+        for (int u = 0; u < numNodes; u++) {
+            for (const Edge& e : adj[u]) {
+                pair<int, int> edge = {min(u, e.to), max(u, e.to)};
+                if (u < e.to && e.active && seenEdges.find(edge) == seenEdges.end()) {
+                    seenEdges.insert(edge);
+                    auto it = edgeIndex.find(edge);
+                    if (it == edgeIndex.end()) continue;
+                    int idx_u = it->second.first, idx_v = it->second.second;
+                    if (idx_u >= static_cast<int>(adj[u].size()) || idx_v >= static_cast<int>(adj[e.to].size())) continue;
+                    double failedLoad = adj[u][idx_u].currentLoad;
+                    adj[u][idx_u].active = false;
+                    adj[e.to][idx_v].active = false;
+                    bool critical = !isConnected();
+                    if (!critical) {
+                        redistributeLoad(u, e.to, failedLoad);
+                        vector<string> overloadedNodes;
+                        vector<pair<int, int>> overloadedEdges;
+                        checkOverloads(overloadedNodes, overloadedEdges);
+                        if (!overloadedNodes.empty() || !overloadedEdges.empty()) {
+                            critical = true;
+                        }
+                    }
+                    if (critical) {
+                        cout << "- Edge " << nodes[u].name << "-" << nodes[e.to].name << ": Failure causes "
+                             << (!isConnected() ? "disconnection" : "overloads") << "\n";
+                    }
+                    adj[u][idx_u].active = true;
+                    adj[e.to][idx_v].active = true;
+                    restoreState(originalState);
+                }
+            }
+        }
+        restoreState(originalState);
+    }
+
     // Report grid state
-    void reportGridState() {
+    void reportGridState() const {
         cout << "\nFinal Grid State:\n";
         int activeNodes = 0, activeEdges = 0;
         for (const auto& node : nodes) {
@@ -317,7 +461,7 @@ public:
         if (!isConnected()) {
             auto components = findComponents();
             cout << "Grid is disconnected! Number of components: " << components.size() << "\n";
-            for (int i = 0; i < components.size(); i++) {
+            for (int i = 0; i < static_cast<int>(components.size()); i++) {
                 cout << "Component " << i + 1 << ": ";
                 for (int v : components[i]) {
                     cout << nodes[v].name << " ";
@@ -330,12 +474,12 @@ public:
     }
 
     // Display grid status
-    void displayGrid() {
+    void displayGrid() const {
         cout << "\nGrid Status:\n";
         cout << "Nodes (Substations):\n";
         for (int i = 0; i < numNodes; i++) {
-            cout << "Node " << nodes[i].name << ": Load = " << fixed << setprecision(2) 
-                 << nodes[i].load << " MW, Max Capacity = " << nodes[i].maxCapacity 
+            cout << "Node " << nodes[i].name << ": Load = " << fixed << setprecision(2)
+                 << nodes[i].load << " MW, Max Capacity = " << nodes[i].maxCapacity
                  << " MW, Status = " << (nodes[i].active ? "Active" : "Failed") << "\n";
         }
         cout << "Edges (Transmission Lines):\n";
@@ -344,8 +488,8 @@ public:
             for (const Edge& e : adj[u]) {
                 pair<int, int> edge = {min(u, e.to), max(u, e.to)};
                 if (u < e.to && seenEdges.find(edge) == seenEdges.end()) {
-                    cout << "Between " << nodes[u].name << " and " << nodes[e.to].name 
-                         << ": Load = " << e.currentLoad << " MW, Capacity = " << e.capacity 
+                    cout << "Between " << nodes[u].name << " and " << nodes[e.to].name
+                         << ": Load = " << e.currentLoad << " MW, Capacity = " << e.capacity
                          << " MW, Status = " << (e.active ? "Active" : "Failed") << "\n";
                     seenEdges.insert(edge);
                 }
@@ -353,8 +497,39 @@ public:
         }
     }
 
+    // Save grid visualization to DOT file
+    void saveGridVisualization(const string& filename) const {
+        ofstream out(filename);
+        if (!out) {
+            cout << "Error opening file: " << filename << "\n";
+            return;
+        }
+        out << "graph G {\n";
+        out << "    rankdir=LR;\n";
+        for (int i = 0; i < numNodes; i++) {
+            out << "    " << nodes[i].name << " [label=\"" << nodes[i].name << "\\nLoad: "
+                << fixed << setprecision(2) << nodes[i].load << " MW\\nCap: " << nodes[i].maxCapacity
+                << " MW\", color=" << (nodes[i].active ? "blue" : "red") << "];\n";
+        }
+        set<pair<int, int>> seenEdges;
+        for (int u = 0; u < numNodes; u++) {
+            for (const Edge& e : adj[u]) {
+                pair<int, int> edge = {min(u, e.to), max(u, e.to)};
+                if (u < e.to && seenEdges.find(edge) == seenEdges.end()) {
+                    out << "    " << nodes[u].name << " -- " << nodes[e.to].name
+                        << " [label=\"Load: " << e.currentLoad << " MW\\nCap: " << e.capacity
+                        << " MW\", color=" << (e.active ? "black" : "red") << "];\n";
+                    seenEdges.insert(edge);
+                }
+            }
+        }
+        out << "}\n";
+        out.close();
+        cout << "Grid visualization saved to " << filename << "\n";
+    }
+
     // Save grid to file
-    void saveGrid(const string& filename) {
+    void saveGrid(const string& filename) const {
         ofstream out(filename);
         if (!out) {
             cout << "Error opening file: " << filename << "\n";
@@ -362,7 +537,7 @@ public:
         }
         out << numNodes << "\n";
         for (int i = 0; i < numNodes; i++) {
-            out << nodes[i].name << " " << nodes[i].load << " " << nodes[i].maxCapacity << "\n";
+            out << nodes[i].name << " " << fixed << setprecision(2) << nodes[i].load << " " << nodes[i].maxCapacity << "\n";
         }
         int edgeCount = 0;
         set<pair<int, int>> seenEdges;
@@ -381,7 +556,7 @@ public:
             for (const Edge& e : adj[u]) {
                 pair<int, int> edge = {min(u, e.to), max(u, e.to)};
                 if (u < e.to && seenEdges.find(edge) == seenEdges.end()) {
-                    out << u << " " << e.to << " " << e.currentLoad << " " << e.capacity << "\n";
+                    out << u << " " << e.to << " " << fixed << setprecision(2) << e.currentLoad << " " << e.capacity << "\n";
                     seenEdges.insert(edge);
                 }
             }
@@ -398,44 +573,96 @@ public:
             return false;
         }
         int n;
-        in >> n;
-        if (n <= 0) {
-            cout << "Invalid number of nodes in file.\n";
+        if (!(in >> n) || n <= 0) {
+            cout << "Invalid number of nodes in file. Must be > 0.\n";
+            in.close();
             return false;
         }
         Graph newGraph(n);
         map<string, int> nameToIndex;
+        string line;
+        getline(in, line); // Clear newline after n
         for (int i = 0; i < n; i++) {
+            getline(in, line);
+            if (in.eof()) {
+                cout << "Unexpected end of file at line " << i + 2 << ".\n";
+                in.close();
+                return false;
+            }
+            istringstream iss(line);
             string name;
             double load, maxCapacity;
-            if (!(in >> name >> load >> maxCapacity)) {
-                cout << "Invalid node data in file.\n";
+            if (!(iss >> name >> load >> maxCapacity) || name.empty()) {
+                cout << "Invalid node data at line " << i + 2 << ". Expected: name load maxCapacity.\n";
+                in.close();
+                return false;
+            }
+            if (load < 0) {
+                cout << "Invalid load at line " << i + 2 << ". Load must be >= 0.\n";
+                in.close();
+                return false;
+            }
+            if (maxCapacity <= 0) {
+                cout << "Invalid max capacity at line " << i + 2 << ". Max capacity must be > 0.\n";
+                in.close();
+                return false;
+            }
+            if (load > maxCapacity) {
+                cout << "Invalid load at line " << i + 2 << ". Load must be <= max capacity.\n";
+                in.close();
                 return false;
             }
             if (!newGraph.addNode(i, name, load, maxCapacity)) {
+                in.close();
                 return false;
             }
             nameToIndex[name] = i;
         }
         int m;
-        in >> m;
-        if (m < 0) {
-            cout << "Invalid number of edges in file.\n";
+        if (!(in >> m) || m < 0) {
+            cout << "Invalid number of edges in file. Must be >= 0.\n";
+            in.close();
             return false;
         }
+        getline(in, line); // Clear newline after m
         for (int i = 0; i < m; i++) {
+            getline(in, line);
+            if (in.eof() && i < m) {
+                cout << "Unexpected end of file at line " << i + n + 3 << ".\n";
+                in.close();
+                return false;
+            }
+            istringstream iss(line);
             int u, v;
             double load, capacity;
-            if (!(in >> u >> v >> load >> capacity)) {
-                cout << "Invalid edge data in file.\n";
+            if (!(iss >> u >> v >> load >> capacity)) {
+                cout << "Invalid edge data at line " << i + n + 3 << ". Expected: u v load capacity.\n";
+                in.close();
+                return false;
+            }
+            if (u < 0 || u >= n || v < 0 || v >= n) {
+                cout << "Invalid node indices at line " << i + n + 3 << ". Indices must be between 0 and " << n - 1 << ".\n";
+                in.close();
+                return false;
+            }
+            if (load < 0) {
+                cout << "Invalid load at line " << i + n + 3 << ". Load must be >= 0.\n";
+                in.close();
+                return false;
+            }
+            if (capacity <= 0) {
+                cout << "Invalid capacity at line " << i + n + 3 << ". Capacity must be > 0.\n";
+                in.close();
                 return false;
             }
             if (!newGraph.addEdge(u, v, capacity, load)) {
+                in.close();
                 return false;
             }
         }
         in.close();
-        *this = newGraph;
+        edgeIndex.clear(); // Clear edgeIndex before assigning new graph
+        *this = move(newGraph); // Use move to avoid unnecessary copying
         cout << "Grid loaded from " << filename << "\n";
         return true;
     }
@@ -457,20 +684,23 @@ void runInteractive(Graph& grid) {
         cout << "2. Check Initial Overloads and Connectivity\n";
         cout << "3. Simulate Uniform Load Increase\n";
         cout << "4. Simulate Random Load Increase\n";
-        cout << "5. Save Grid to File\n";
-        cout << "6. Load Grid from File\n";
-        cout << "7. Exit\n";
+        cout << "5. Identify Critical Components\n";
+        cout << "6. Save Grid to File\n";
+        cout << "7. Load Grid from File\n";
+        cout << "8. Exit\n";
         cout << "Enter choice: ";
         int choice;
-        if (!(cin >> choice)) {
-            cout << "Invalid input. Please enter a number.\n";
+        while (!(cin >> choice) || choice < 1 || choice > 8) {
+            cout << "Invalid input. Please enter a number between 1 and 8.\n";
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            continue;
+            cout << "Enter choice: ";
         }
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear newline
         switch (choice) {
             case 1:
                 grid.displayGrid();
+                grid.saveGridVisualization("grid.dot");
                 break;
             case 2: {
                 vector<string> overloadedNodes;
@@ -487,7 +717,7 @@ void runInteractive(Graph& grid) {
                     if (!overloadedEdges.empty()) {
                         cout << "Overloaded Transmission Lines:\n";
                         for (const auto& e : overloadedEdges) {
-                            cout << "- Between " << grid.getNodeName(e.first) << " and " 
+                            cout << "- Between " << grid.getNodeName(e.first) << " and "
                                  << grid.getNodeName(e.second) << "\n";
                         }
                     }
@@ -500,46 +730,59 @@ void runInteractive(Graph& grid) {
             case 3: {
                 double loadIncrease;
                 cout << "Enter load increase percentage (e.g., 10 for 10%): ";
-                if (!(cin >> loadIncrease)) {
-                    cout << "Invalid input. Please enter a number.\n";
+                while (!(cin >> loadIncrease) || loadIncrease < 0) {
+                    cout << "Invalid input. Please enter a non-negative number.\n";
                     cin.clear();
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    continue;
+                    cout << "Enter load increase percentage: ";
                 }
+                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear newline
                 grid.simulateCascadingFailures(loadIncrease, false);
                 break;
             }
             case 4: {
                 double loadIncrease;
                 cout << "Enter base load increase percentage (e.g., 10 for 10%): ";
-                if (!(cin >> loadIncrease)) {
-                    cout << "Invalid input. Please enter a number.\n";
+                while (!(cin >> loadIncrease) || loadIncrease < 0) {
+                    cout << "Invalid input. Please enter a non-negative number.\n";
                     cin.clear();
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    continue;
+                    cout << "Enter base load increase percentage: ";
                 }
+                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear newline
                 grid.simulateCascadingFailures(loadIncrease, true);
                 break;
             }
-            case 5: {
+            case 5:
+                grid.identifyCriticalComponents();
+                break;
+            case 6: {
                 string filename;
                 cout << "Enter filename to save grid: ";
-                cin >> filename;
+                getline(cin, filename);
+                if (filename.empty()) {
+                    cout << "Invalid filename.\n";
+                    break;
+                }
                 grid.saveGrid(filename);
                 break;
             }
-            case 6: {
+            case 7: {
                 string filename;
                 cout << "Enter filename to load grid: ";
-                cin >> filename;
+                getline(cin, filename);
+                if (filename.empty()) {
+                    cout << "Invalid filename.\n";
+                    break;
+                }
                 grid.loadGrid(filename);
                 break;
             }
-            case 7:
+            case 8:
                 cout << "Exiting program.\n";
                 return;
             default:
-                cout << "Invalid choice. Please select 1-7.\n";
+                break; // Unreachable due to input validation
         }
     }
 }
@@ -555,6 +798,7 @@ int main() {
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
         cout << "Enter number of nodes: ";
     }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear newline
     Graph grid(numNodes);
 
     // Input nodes
@@ -562,10 +806,18 @@ int main() {
         string name;
         double load, maxCapacity;
         cout << "Enter name, load (MW), and max capacity (MW) for node " << i << ": ";
-        while (!(cin >> name >> load >> maxCapacity) || !grid.addNode(i, name, load, maxCapacity)) {
-            cout << "Invalid input. Try again: ";
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        while (true) {
+            string line;
+            getline(cin, line);
+            istringstream iss(line);
+            if (!(iss >> name >> load >> maxCapacity)) {
+                cout << "Invalid input. Expected: name load maxCapacity (load >= 0, maxCapacity > 0, load <= maxCapacity). Try again: ";
+                continue;
+            }
+            if (grid.addNode(i, name, load, maxCapacity)) {
+                break;
+            }
+            cout << "Try again: ";
         }
     }
 
@@ -578,14 +830,23 @@ int main() {
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
         cout << "Enter number of edges: ";
     }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear newline
     for (int i = 0; i < numEdges; i++) {
         int u, v;
         double capacity, currentLoad;
         cout << "Enter edge " << i << ": from node index, to node index, load (MW), capacity (MW): ";
-        while (!(cin >> u >> v >> currentLoad >> capacity) || !grid.addEdge(u, v, capacity, currentLoad)) {
-            cout << "Invalid input. Try again: ";
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        while (true) {
+            string line;
+            getline(cin, line);
+            istringstream iss(line);
+            if (!(iss >> u >> v >> currentLoad >> capacity)) {
+                cout << "Invalid input. Expected: u v load capacity (0 <= u,v < " << numNodes << ", load >= 0, capacity > 0). Try again: ";
+                continue;
+            }
+            if (grid.addEdge(u, v, capacity, currentLoad)) {
+                break;
+            }
+            cout << "Try again: ";
         }
     }
 
