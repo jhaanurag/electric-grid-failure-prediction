@@ -32,7 +32,36 @@ This is an **interactive electric grid simulation** that demonstrates how power 
 
 ---
 
-### **Step 3: Critical Component Analysis (1 minute)**
+### **Step 3: Interactive DFS Algorithm Demo (2 minutes)**
+
+**Show the Algorithm in Action:**
+1. Load the **"🌳 Tree Demo (9 nodes)"** preset for best DFS visualization
+2. Click **"🔍 Show DFS Algorithm"**
+3. Explain the visualization:
+   - *"Now you can see exactly how Depth-First Search works!"*
+   - *"Gray nodes are unvisited, orange are in the stack, blue are visited"*
+   - *"Red shows the current node being processed"*
+   - *"The tree layout shows how DFS explores branches deeply before backtracking"*
+
+**Step Through the Algorithm:**
+1. Click **"Step Forward"** to advance one step at a time
+2. Point out each step:
+   - *"See how it pops a node from the stack"*
+   - *"Marks it as visited (blue)"*
+   - *"Adds unvisited neighbors to the stack (orange)"*
+   - *"Notice how it goes deep into one branch before exploring others"*
+
+**Auto-Play Feature:**
+1. Click **"Reset"** then **"Auto Play"**
+2. Adjust speed slider to show faster/slower
+3. Explain: *"This is the same algorithm running in our grid analysis - just visualized!"*
+
+**Key Teaching Moment:**
+*"The stack shows which nodes to visit next - this is why it's called 'depth-first' - it goes as deep as possible before backtracking!"*
+
+---
+
+### **Step 4: Critical Component Analysis (1 minute)**
 
 **Show the Graph Algorithm in Action:**
 1. With Critical Grid loaded, click **"Analyze Critical Components"**
@@ -46,7 +75,7 @@ This is an **interactive electric grid simulation** that demonstrates how power 
 
 ---
 
-### **Step 4: Cascading Failure Simulation (2 minutes)**
+### **Step 5: Cascading Failure Simulation (2 minutes)**
 
 **Demonstrate the Main Feature:**
 1. Load **"Complex Grid (6 nodes)"** 
@@ -66,7 +95,7 @@ This is an **interactive electric grid simulation** that demonstrates how power 
 
 ---
 
-### **Step 5: Compare Different Scenarios (1 minute)**
+### **Step 6: Compare Different Scenarios (1 minute)**
 
 **Show Network Resilience:**
 
@@ -82,7 +111,7 @@ This is an **interactive electric grid simulation** that demonstrates how power 
 
 ---
 
-### **Step 6: Real-World Applications (30 seconds)**
+### **Step 7: Real-World Applications (30 seconds)**
 
 **Explain the Practical Value:**
 - *"Power companies use similar analysis for grid planning"*

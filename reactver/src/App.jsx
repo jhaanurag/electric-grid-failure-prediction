@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import DFSVisualization from './components/DFSVisualization'
 
 const isGridConnected = (nodes, edges) => {
   const activeNodes = nodes.filter(n => n.active)
@@ -126,6 +127,7 @@ function App() {
 
   const [loadIncrease, setLoadIncrease] = useState(10)
   const [simulationResults, setSimulationResults] = useState(null)
+  const [showDFSVisualization, setShowDFSVisualization] = useState(false)
 
   const loadPreset = (presetName) => {
     const presets = {
@@ -139,6 +141,29 @@ function App() {
           { from: 0, to: 1, load: 20, capacity: 40, active: true },
           { from: 1, to: 2, load: 25, capacity: 50, active: true },
           { from: 0, to: 2, load: 15, capacity: 30, active: true }
+        ]
+      },
+      tree: {
+        nodes: [
+          { id: 0, name: 'Root', x: 200, y: 80, load: 50, maxCapacity: 100, active: true },
+          { id: 1, name: 'B', x: 120, y: 160, load: 40, maxCapacity: 80, active: true },
+          { id: 2, name: 'C', x: 280, y: 160, load: 45, maxCapacity: 90, active: true },
+          { id: 3, name: 'D', x: 80, y: 240, load: 35, maxCapacity: 70, active: true },
+          { id: 4, name: 'E', x: 160, y: 240, load: 30, maxCapacity: 60, active: true },
+          { id: 5, name: 'F', x: 240, y: 240, load: 25, maxCapacity: 50, active: true },
+          { id: 6, name: 'G', x: 320, y: 240, load: 40, maxCapacity: 80, active: true },
+          { id: 7, name: 'H', x: 40, y: 320, load: 20, maxCapacity: 40, active: true },
+          { id: 8, name: 'I', x: 120, y: 320, load: 25, maxCapacity: 50, active: true }
+        ],
+        edges: [
+          { from: 0, to: 1, load: 25, capacity: 50, active: true },
+          { from: 0, to: 2, load: 30, capacity: 60, active: true },
+          { from: 1, to: 3, load: 20, capacity: 40, active: true },
+          { from: 1, to: 4, load: 15, capacity: 30, active: true },
+          { from: 2, to: 5, load: 18, capacity: 35, active: true },
+          { from: 2, to: 6, load: 22, capacity: 45, active: true },
+          { from: 3, to: 7, load: 10, capacity: 20, active: true },
+          { from: 3, to: 8, load: 12, capacity: 25, active: true }
         ]
       },
       complex: {
@@ -356,6 +381,9 @@ function App() {
             <button onClick={() => loadPreset('simple')}>
               Simple Grid (3 nodes)
             </button>
+            <button onClick={() => loadPreset('tree')}>
+              🌳 Tree Demo (9 nodes)
+            </button>
             <button onClick={() => loadPreset('complex')}>
               Complex Grid (6 nodes)
             </button>
@@ -388,6 +416,9 @@ function App() {
           </button>
           <button onClick={analyzeCriticalComponents} style={{marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)'}}>
             Analyze Critical Components
+          </button>
+          <button onClick={() => setShowDFSVisualization(true)} style={{marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #38b2ac 0%, #319795 100%)'}}>
+            🔍 Show DFS Algorithm
           </button>
         </div>
 
@@ -621,6 +652,14 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {showDFSVisualization && (
+        <DFSVisualization 
+          nodes={nodes} 
+          edges={edges} 
+          onClose={() => setShowDFSVisualization(false)} 
+        />
+      )}
     </div>
   )
 }

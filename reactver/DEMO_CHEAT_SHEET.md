@@ -1,33 +1,40 @@
 # 🎯 Quick Demo Cheat Sheet
 
 ## 30-Second Elevator Pitch
-*"This app simulates electric power grids and shows how failures cascade through networks, just like the 2003 Northeast blackout. It uses graph algorithms to find critical infrastructure and predict failure patterns."*
+*"This app simulates electric power grids and shows how failures cascade through networks, just like the 2003 Northeast blackout. It uses graph algorithms to find critical infrastructure and includes an interactive DFS visualization that shows exactly how the algorithm works step-by-step."*
 
-## 🎪 5-Minute Live Demo Script
+## 🎪 6-Minute Live Demo Script
 
 ### **Step 1: Show the Problem (30 sec)**
 1. Click **"Critical Path (6 nodes)"**
 2. Point out red/orange components: *"This grid is already stressed"*
 3. Say: *"Let's see what happens when we increase load by just 10%"*
 
-### **Step 2: Demonstrate Cascade (1 min)**
+### **Step 2: Interactive Algorithm Demo (1.5 min)**
+1. Click **"🔍 Show DFS Algorithm"**
+2. Explain: *"This shows exactly how Depth-First Search works"*
+3. Click **"Step Forward"** a few times: *"Gray=unvisited, orange=in stack, blue=visited, red=current"*
+4. Click **"Auto Play"**: *"This is the same algorithm analyzing our grid connectivity!"*
+5. Close the visualization
+
+### **Step 3: Demonstrate Cascade (1 min)**
 1. Set load increase to **10%**
 2. Click **"Simulate Cascading Failures"**
 3. Watch the failures cascade
 4. Point out: *"Look how one failure leads to another - just like real blackouts!"*
 
-### **Step 3: Show the Algorithm (1 min)**
+### **Step 4: Show Critical Analysis (1 min)**
 1. Click **"Analyze Critical Components"**
-2. Explain: *"The algorithm uses graph theory to find single points of failure"*
+2. Explain: *"The DFS algorithm finds single points of failure"*
 3. Point to critical components: *"These red items are dangerous - if they fail, the grid splits apart"*
 
-### **Step 4: Compare Resilience (1.5 min)**
+### **Step 5: Compare Resilience (1.5 min)**
 1. Click **"Ring Network (5 nodes)"**
 2. Try **20% load increase**
 3. Show it survives better: *"Redundant connections make it resilient"*
 4. Compare: *"Same stress, different topology, different outcome"*
 
-### **Step 5: Real-World Impact (1 min)**
+### **Step 6: Real-World Impact (30 sec)**
 - *"Power companies use similar analysis to prevent blackouts"*
 - *"The 2003 Northeast blackout affected 55 million people - started with one tree"*
 - *"This helps identify weak points before they cause problems"*
@@ -43,6 +50,7 @@
 - ✅ **Relevant**: Based on real power grid engineering
 
 ### **Technical Highlights:**
+- **Interactive DFS Visualization**: Step-by-step algorithm demonstration
 - **Graph Algorithms**: Depth-First Search for connectivity
 - **Critical Path Analysis**: Finding articulation points
 - **Cascade Simulation**: Modeling failure propagation
