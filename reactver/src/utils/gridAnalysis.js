@@ -60,7 +60,7 @@ export const redistributeLoad = (nodes, edges, failedEdge) => {
   
   const newEdges = [...edges]
   
-  [from, to].forEach(nodeId => {
+  ;[from, to].forEach(nodeId => {
     const nodeEdges = newEdges.filter(edge => 
       edge.active && 
       (edge.from === nodeId || edge.to === nodeId) && 

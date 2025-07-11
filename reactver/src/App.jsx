@@ -1,6 +1,111 @@
 import { useState } from 'react'
 import './App.css'
 
+const isGridConnected = (nodes, edges) => {
+  const activeNodes = nodes.filter(n => n.active)
+  if (activeNodes.length <= 1) return true
+  
+  const graph = new Map()
+  activeNodes.forEach(node => graph.set(node.id, []))
+  
+  edges.filter(e => e.active).forEach(edge => {
+    if (graph.has(edge.from) && graph.has(edge.to)) {
+      graph.get(edge.from).push(edge.to)
+      graph.get(edge.to).push(edge.from)
+    }
+  })
+  
+  const visited = new Set()
+  const stack = [activeNodes[0].id]
+  
+  while (stack.length > 0) {
+    const nodeId = stack.pop()
+    if (!visited.has(nodeId)) {
+      visited.add(nodeId)
+      const neighbors = graph.get(nodeId) || []
+      neighbors.forEach(neighbor => {
+        if (!visited.has(neighbor)) {
+          stack.push(neighbor)
+        }
+      })
+    }
+  }
+  
+  return visited.size === activeNodes.length
+}
+
+const findConnectedComponents = (nodes, edges) => {
+  const activeNodes = nodes.filter(n => n.active)
+  if (activeNodes.length === 0) return []
+  
+  const graph = new Map()
+  activeNodes.forEach(node => graph.set(node.id, []))
+  
+  edges.filter(e => e.active).forEach(edge => {
+    if (graph.has(edge.from) && graph.has(edge.to)) {
+      graph.get(edge.from).push(edge.to)
+      graph.get(edge.to).push(edge.from)
+    }
+  })
+  
+  const visited = new Set()
+  const components = []
+  
+  activeNodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      const component = []
+      const stack = [node.id]
+      
+      while (stack.length > 0) {
+        const nodeId = stack.pop()
+        if (!visited.has(nodeId)) {
+          visited.add(nodeId)
+          component.push(nodeId)
+          const neighbors = graph.get(nodeId) || []
+          neighbors.forEach(neighbor => {
+            if (!visited.has(neighbor)) {
+              stack.push(neighbor)
+            }
+          })
+        }
+      }
+      
+      if (component.length > 0) {
+        components.push(component)
+      }
+    }
+  })
+  
+  return components
+}
+
+const findCriticalComponents = (nodes, edges) => {
+  const criticalNodes = []
+  const criticalEdges = []
+  
+  nodes.filter(n => n.active).forEach(node => {
+    const testNodes = nodes.map(n => ({ ...n, active: n.id === node.id ? false : n.active }))
+    const testEdges = edges.filter(e => e.from !== node.id && e.to !== node.id)
+    
+    if (!isGridConnected(testNodes, testEdges)) {
+      criticalNodes.push(node)
+    }
+  })
+  
+  edges.filter(e => e.active).forEach(edge => {
+    const testEdges = edges.map(e => ({ 
+      ...e, 
+      active: (e.from === edge.from && e.to === edge.to) ? false : e.active 
+    }))
+    
+    if (!isGridConnected(nodes, testEdges)) {
+      criticalEdges.push(edge)
+    }
+  })
+  
+  return { nodes: criticalNodes, edges: criticalEdges }
+}
+
 function App() {
   const [nodes, setNodes] = useState([
     { id: 0, name: 'A', x: 100, y: 100, load: 50, maxCapacity: 100, active: true },
@@ -55,6 +160,43 @@ function App() {
           { from: 1, to: 5, load: 25, capacity: 40, active: true },
           { from: 4, to: 5, load: 20, capacity: 30, active: true }
         ]
+      },
+      ring: {
+        nodes: [
+          { id: 0, name: 'N', x: 200, y: 50, load: 65, maxCapacity: 100, active: true },
+          { id: 1, name: 'E', x: 350, y: 150, load: 70, maxCapacity: 110, active: true },
+          { id: 2, name: 'S', x: 200, y: 250, load: 55, maxCapacity: 90, active: true },
+          { id: 3, name: 'W', x: 50, y: 150, load: 60, maxCapacity: 95, active: true },
+          { id: 4, name: 'C', x: 200, y: 150, load: 75, maxCapacity: 120, active: true }
+        ],
+        edges: [
+          { from: 0, to: 1, load: 40, capacity: 80, active: true },
+          { from: 1, to: 2, load: 35, capacity: 75, active: true },
+          { from: 2, to: 3, load: 30, capacity: 70, active: true },
+          { from: 3, to: 0, load: 45, capacity: 85, active: true },
+          { from: 4, to: 0, load: 25, capacity: 60, active: true },
+          { from: 4, to: 1, load: 30, capacity: 65, active: true },
+          { from: 4, to: 2, load: 35, capacity: 70, active: true },
+          { from: 4, to: 3, load: 40, capacity: 75, active: true }
+        ]
+      },
+      critical: {
+        nodes: [
+          { id: 0, name: 'Gen', x: 50, y: 150, load: 95, maxCapacity: 100, active: true },
+          { id: 1, name: 'T1', x: 150, y: 100, load: 88, maxCapacity: 90, active: true },
+          { id: 2, name: 'T2', x: 150, y: 200, load: 85, maxCapacity: 90, active: true },
+          { id: 3, name: 'Hub', x: 250, y: 150, load: 92, maxCapacity: 100, active: true },
+          { id: 4, name: 'L1', x: 350, y: 100, load: 75, maxCapacity: 80, active: true },
+          { id: 5, name: 'L2', x: 350, y: 200, load: 70, maxCapacity: 75, active: true }
+        ],
+        edges: [
+          { from: 0, to: 1, load: 48, capacity: 50, active: true },
+          { from: 0, to: 2, load: 47, capacity: 50, active: true },
+          { from: 1, to: 3, load: 44, capacity: 45, active: true },
+          { from: 2, to: 3, load: 43, capacity: 45, active: true },
+          { from: 3, to: 4, load: 39, capacity: 40, active: true },
+          { from: 3, to: 5, load: 37, capacity: 38, active: true }
+        ]
       }
     }
     
@@ -67,37 +209,116 @@ function App() {
 
   const simulateFailure = () => {
     const factor = 1 + loadIncrease / 100
-    const newNodes = nodes.map(node => ({
+    let currentNodes = nodes.map(node => ({
       ...node,
       load: node.load * factor
     }))
     
-    const newEdges = edges.map(edge => ({
+    let currentEdges = edges.map(edge => ({
       ...edge,
       load: edge.load * factor
     }))
 
     const failures = []
-    const overloadedNodes = newNodes.filter(node => node.load >= node.maxCapacity)
-    const overloadedEdges = newEdges.filter(edge => edge.load >= edge.capacity)
-    
-    overloadedNodes.forEach(node => {
-      failures.push(`Node ${node.name} failed: ${node.load.toFixed(1)}MW > ${node.maxCapacity}MW`)
-    })
-    
-    overloadedEdges.forEach(edge => {
-      const fromNode = nodes.find(n => n.id === edge.from)
-      const toNode = nodes.find(n => n.id === edge.to)
-      failures.push(`Edge ${fromNode.name}-${toNode.name} failed: ${edge.load.toFixed(1)}MW > ${edge.capacity}MW`)
-    })
+    const cascadeSteps = []
+    let iteration = 0
+    const maxIterations = 10
 
-    setNodes(newNodes)
-    setEdges(newEdges)
+    while (iteration < maxIterations) {
+      const overloadedNodes = currentNodes.filter(node => node.active && node.load >= node.maxCapacity)
+      const overloadedEdges = currentEdges.filter(edge => edge.active && edge.load >= edge.capacity)
+      
+      if (overloadedNodes.length === 0 && overloadedEdges.length === 0) {
+        break
+      }
+      
+      const allOverloads = [
+        ...overloadedNodes.map(node => ({
+          type: 'node',
+          component: node,
+          severity: node.load / node.maxCapacity
+        })),
+        ...overloadedEdges.map(edge => ({
+          type: 'edge',
+          component: edge,
+          severity: edge.load / edge.capacity
+        }))
+      ]
+      
+      allOverloads.sort((a, b) => b.severity - a.severity)
+      
+      if (allOverloads.length === 0) break
+      
+      const mostCritical = allOverloads[0]
+      
+      if (mostCritical.type === 'node') {
+        const nodeIndex = currentNodes.findIndex(n => n.id === mostCritical.component.id)
+        if (nodeIndex !== -1) {
+          currentNodes[nodeIndex].active = false
+          failures.push(`Step ${iteration + 1}: Node ${mostCritical.component.name} failed (${mostCritical.component.load.toFixed(1)}MW > ${mostCritical.component.maxCapacity}MW)`)
+          
+          currentEdges = currentEdges.map(edge => {
+            if (edge.from === mostCritical.component.id || edge.to === mostCritical.component.id) {
+              return { ...edge, active: false }
+            }
+            return edge
+          })
+        }
+      } else {
+        const edgeIndex = currentEdges.findIndex(e => 
+          e.from === mostCritical.component.from && e.to === mostCritical.component.to
+        )
+        if (edgeIndex !== -1) {
+          currentEdges[edgeIndex].active = false
+          const fromNode = currentNodes.find(n => n.id === mostCritical.component.from)
+          const toNode = currentNodes.find(n => n.id === mostCritical.component.to)
+          failures.push(`Step ${iteration + 1}: Edge ${fromNode?.name}-${toNode?.name} failed (${mostCritical.component.load.toFixed(1)}MW > ${mostCritical.component.capacity}MW)`)
+        }
+      }
+      
+      const connected = isGridConnected(currentNodes, currentEdges)
+      const components = findConnectedComponents(currentNodes, currentEdges)
+      
+      cascadeSteps.push({
+        iteration: iteration + 1,
+        connected,
+        components: components.length,
+        activeNodes: currentNodes.filter(n => n.active).length,
+        activeEdges: currentEdges.filter(e => e.active).length
+      })
+      
+      if (!connected && components.length > 1) {
+        failures.push(`Step ${iteration + 1}: Grid disconnected! ${components.length} isolated components created`)
+        break
+      }
+      
+      iteration++
+    }
+
+    const finalConnected = isGridConnected(currentNodes, currentEdges)
+    const finalComponents = findConnectedComponents(currentNodes, currentEdges)
+
+    setNodes(currentNodes)
+    setEdges(currentEdges)
     setSimulationResults({
       totalFailures: failures.length,
-      nodeFailures: overloadedNodes.length,
-      edgeFailures: overloadedEdges.length,
-      failures: failures
+      nodeFailures: currentNodes.filter(n => !n.active).length,
+      edgeFailures: currentEdges.filter(e => !e.active).length,
+      failures: failures,
+      cascadeSteps: cascadeSteps,
+      finalConnected: finalConnected,
+      finalComponents: finalComponents,
+      iterations: iteration
+    })
+  }
+
+  const analyzeCriticalComponents = () => {
+    const critical = findCriticalComponents(nodes, edges)
+    setSimulationResults({
+      type: 'critical',
+      criticalNodes: critical.nodes,
+      criticalEdges: critical.edges,
+      totalCritical: critical.nodes.length + critical.edges.length
     })
   }
 
@@ -121,6 +342,9 @@ function App() {
     return '#666666'
   }
 
+  const gridConnected = isGridConnected(nodes, edges)
+  const components = findConnectedComponents(nodes, edges)
+
   return (
     <div className="app">
       <div className="sidebar">
@@ -135,9 +359,15 @@ function App() {
             <button onClick={() => loadPreset('complex')}>
               Complex Grid (6 nodes)
             </button>
+            <button onClick={() => loadPreset('ring')}>
+              Ring Network (5 nodes)
+            </button>
+            <button onClick={() => loadPreset('critical')}>
+              Critical Path (6 nodes)
+            </button>
           </div>
           <button onClick={resetGrid} style={{marginTop: '12px', width: '100%'}}>
-            Reset Grid
+            Reset to Simple Grid
           </button>
         </div>
 
@@ -154,7 +384,10 @@ function App() {
             />
           </div>
           <button onClick={simulateFailure} style={{marginTop: '12px', width: '100%'}}>
-            Simulate Load Increase
+            Simulate Cascading Failures
+          </button>
+          <button onClick={analyzeCriticalComponents} style={{marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)'}}>
+            Analyze Critical Components
           </button>
         </div>
 
@@ -170,34 +403,118 @@ function App() {
               <p>{edges.filter(e => e.active).length}/{edges.length}</p>
             </div>
             <div className="status-item">
+              <h4>Connectivity</h4>
+              <p style={{color: gridConnected ? '#44aa44' : '#ff4444'}}>
+                {gridConnected ? 'Connected' : 'Disconnected'}
+              </p>
+            </div>
+            <div className="status-item">
+              <h4>Components</h4>
+              <p>{components.length}</p>
+            </div>
+            <div className="status-item">
               <h4>Overloaded Nodes</h4>
-              <p>{nodes.filter(n => n.load >= n.maxCapacity).length}</p>
+              <p>{nodes.filter(n => n.active && n.load >= n.maxCapacity).length}</p>
             </div>
             <div className="status-item">
               <h4>Overloaded Edges</h4>
-              <p>{edges.filter(e => e.load >= e.capacity).length}</p>
+              <p>{edges.filter(e => e.active && e.load >= e.capacity).length}</p>
             </div>
           </div>
         </div>
 
-        {simulationResults && (
+        {simulationResults && simulationResults.type === 'critical' && (
           <div className="control-section">
-            <h2>Simulation Results</h2>
+            <h2>Critical Component Analysis</h2>
             <div className="simulation-results">
-              <h3>Results Summary</h3>
+              <h3>Critical Infrastructure</h3>
               <ul className="results-list">
-                <li>Total Failures: {simulationResults.totalFailures}</li>
-                <li>Node Failures: {simulationResults.nodeFailures}</li>
-                <li>Edge Failures: {simulationResults.edgeFailures}</li>
+                <li>Total Critical Components: {simulationResults.totalCritical}</li>
+                <li>Critical Nodes: {simulationResults.criticalNodes.length}</li>
+                <li>Critical Edges: {simulationResults.criticalEdges.length}</li>
               </ul>
+              
+              {simulationResults.criticalNodes.length > 0 && (
+                <div>
+                  <h4>Critical Nodes (Single Points of Failure):</h4>
+                  <ul className="results-list">
+                    {simulationResults.criticalNodes.map((node, index) => (
+                      <li key={index} style={{color: '#e53e3e'}}>
+                        <strong>{node.name}</strong> - Failure would disconnect grid
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {simulationResults.criticalEdges.length > 0 && (
+                <div>
+                  <h4>Critical Edges (Single Points of Failure):</h4>
+                  <ul className="results-list">
+                    {simulationResults.criticalEdges.map((edge, index) => {
+                      const fromNode = nodes.find(n => n.id === edge.from)
+                      const toNode = nodes.find(n => n.id === edge.to)
+                      return (
+                        <li key={index} style={{color: '#e53e3e'}}>
+                          <strong>{fromNode?.name}-{toNode?.name}</strong> - Failure would disconnect grid
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+              
+              {simulationResults.totalCritical === 0 && (
+                <p style={{color: '#44aa44', fontWeight: 'bold'}}>
+                  ✅ No single points of failure detected - Grid has good redundancy!
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {simulationResults && simulationResults.type !== 'critical' && (
+          <div className="control-section">
+            <h2>Cascading Failure Results</h2>
+            <div className="simulation-results">
+              <h3>Final Grid State</h3>
+              <ul className="results-list">
+                <li>Total Failure Steps: {simulationResults.iterations}</li>
+                <li>Failed Nodes: {simulationResults.nodeFailures}</li>
+                <li>Failed Edges: {simulationResults.edgeFailures}</li>
+                <li style={{color: simulationResults.finalConnected ? '#44aa44' : '#e53e3e'}}>
+                  Final State: {simulationResults.finalConnected ? 'Connected' : 'Disconnected'}
+                </li>
+                {!simulationResults.finalConnected && (
+                  <li style={{color: '#e53e3e'}}>
+                    Isolated Components: {simulationResults.finalComponents.length}
+                  </li>
+                )}
+              </ul>
+              
               {simulationResults.failures.length > 0 && (
                 <div>
-                  <h4>Failure Details:</h4>
+                  <h4>Cascade Sequence:</h4>
                   <ul className="results-list">
                     {simulationResults.failures.map((failure, index) => (
                       <li key={index}>{failure}</li>
                     ))}
                   </ul>
+                </div>
+              )}
+              
+              {!simulationResults.finalConnected && simulationResults.finalComponents.length > 1 && (
+                <div>
+                  <h4>Isolated Grid Sections:</h4>
+                  {simulationResults.finalComponents.map((component, index) => (
+                    <div key={index} style={{margin: '8px 0', padding: '8px', backgroundColor: '#fed7aa', borderRadius: '4px'}}>
+                      <strong>Component {index + 1}:</strong> {' '}
+                      {component.map(nodeId => {
+                        const node = nodes.find(n => n.id === nodeId)
+                        return node?.name || 'Unknown'
+                      }).join(', ')}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
